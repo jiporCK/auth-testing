@@ -8,6 +8,46 @@ function App() {
   const [password, setPassword] = useState("")
   const [address, setAddress] = useState("")
 
+  const fetchWithRefresh = async (url: string, options: RequestInit = {}, retry = true): Promise<Response> => {
+    const res = await fetch(url, {
+      ...options,
+      credentials: 'include', // Ensure cookies are sent
+    });
+  
+    if (res.status === 401 && retry) {
+      console.warn("Access token expired, attempting refresh...");
+  
+      // Try refresh
+      const refreshRes = await fetch('http://localhost:8080/api/v1/auth/refresh', {
+        method: 'POST',
+        credentials: 'include',
+      });
+  
+      if (refreshRes.ok) {
+        console.info("Token refreshed. Retrying original request...");
+        return fetchWithRefresh(url, options, false); // retry once
+      } else {
+        console.error("Refresh failed");
+      }
+    }
+  
+    return res;
+  };  
+
+  const handleGetUsers = async () => {
+    const res = await fetchWithRefresh('http://localhost:8080/api/v1/users', {
+      method: 'GET',
+    });
+  
+    if (res.ok) {
+      const data = await res.json();
+      console.log("Users:", data);
+      setMessage("Fetched users ✅ Check console");
+    } else {
+      setMessage(`❌ ${res.statusText}`);
+    }
+  };  
+
   const handleRegister = async () => {
     const res = await fetch('http://localhost:8080/api/v1/users/register', {
       method: 'POST',
@@ -21,22 +61,6 @@ function App() {
     const data = await res.json()
     setMessage(res.ok ? "Registered successfully ✅" : `❌ ${data.message || res.statusText}`)
   }
-
-  const handleGetUsers = async () => {
-    const res = await fetch('http://localhost:8080/api/v1/users', {
-      method: 'GET',
-      credentials: 'include',
-    });
-  
-    if (res.ok) {
-      const data = await res.json();
-      console.log("Users:", data);
-      setMessage("Fetched users ✅ Check console");
-    } else {
-      setMessage(`❌ ${res.statusText}`);
-    }
-  };
-  
 
   const handleLogin = async () => {
     const res = await fetch('http://localhost:8080/api/v1/auth/login', {
